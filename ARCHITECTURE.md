@@ -106,29 +106,29 @@ Stroke {
 **7. Canvas Rendering Strategy**
 **7.1 Incremental Drawing (Normal Case)**
 
-·Canvas is not cleared on every mouse move
-·Only the new line segment is drawn
-·Ensures smooth performance
+-Canvas is not cleared on every mouse move
+-Only the new line segment is drawn
+-Ensures smooth performance
 
 **7.2 Full Canvas Rebuild (Rare Case)**
 Triggered only on:
 
-·Late join
-·Undo
-·Redo
+-Late join
+-Undo
+-Redo
 
 Process: Clear canvas → Replay all stroke operations
 
 **8. Cursor Rendering (Overlay Canvas)**
 To avoid polluting the drawing canvas:
-·Two canvas layers are used:
+-Two canvas layers are used:
    Base canvas → persistent drawing
    Overlay canvas → cursors only
 
 The cursor canvas:
-·Is cleared every update
-·Uses pointer-events: none
-·Does not affect undo/redo or replay
+-Is cleared every update
+-Uses pointer-events: none
+-Does not affect undo/redo or replay
 
 **9. Undo / Redo Architecture (Global)**
 Undo and redo are global operations, not per-user.
@@ -151,33 +151,33 @@ redoStack[]   // undone strokes
 4. Broadcast full canvas
 
 **Why This Works**
-·Deterministic ordering
-·No conflicts
-·All clients remain consistent
+-Deterministic ordering
+-No conflicts
+-All clients remain consistent
 Undo is intentionally allowed across users.
 
 **10. Conflict Resolution Strategy**
 No explicit conflict resolution is required.
 
-·Overlapping strokes are valid
-·Server arrival order defines layering
-·Later strokes render on top
+-Overlapping strokes are valid
+-Server arrival order defines layering
+-Later strokes render on top
 
 This matches behavior of real collaborative tools.
 
 **11. Performance Considerations**
 
-·Lightweight point-based events
-·No full redraw during drawing
-·Cursor rendering isolated from drawing logic
-·Minimal server-side computation
+-Lightweight point-based events
+-No full redraw during drawing
+-Cursor rendering isolated from drawing logic
+-Minimal server-side computation
 
 **12. Summary**
 This system prioritizes:
 
-·Deterministic synchronization
-·Server-authoritative state
-·Clean undo/redo semantics
-·Real-time performance
+-Deterministic synchronization
+-Server-authoritative state
+-Clean undo/redo semantics
+-Real-time performance
 
 The architecture mirrors how real collaborative drawing tools are designed.
