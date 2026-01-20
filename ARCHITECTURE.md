@@ -82,9 +82,9 @@ Stroke {
 }
 ```
 
-**6. WebSocket Protocol**
+## 6. WebSocket Protocol**
 
-**6.1 Client -> Server WebSocket Events**
+### 6.1 Client -> Server WebSocket Events
 | Event Name       | Payload                          | Description                         |
 |------------------|----------------------------------|-------------------------------------|
 | STROKE_START     | { point, tool, color }           | Start a new stroke                  |
@@ -94,7 +94,7 @@ Stroke {
 | UNDO             | —                                | Undo last global stroke             |
 | REDO             | —                                | Redo last undone stroke             |
 
-**6.2 Server → Client WebSocket Events**
+### 6.2 Server → Client WebSocket Events**
 | Event Name       | Payload                          | Description                         |
 |------------------|----------------------------------|-------------------------------------|
 | INIT_CANVAS      | Stroke[]                         | Full canvas state sync              |
@@ -103,81 +103,81 @@ Stroke {
 | STROKE_END       | —                                | Remote stroke ended                 |
 | CURSOR_MOVE      | { userId, x, y, color }          | Remote user cursor position         |
 
-**7. Canvas Rendering Strategy**
-**7.1 Incremental Drawing (Normal Case)**
+## 7. Canvas Rendering Strategy**
+### 7.1 Incremental Drawing (Normal Case)
 
--Canvas is not cleared on every mouse move
--Only the new line segment is drawn
--Ensures smooth performance
+- Canvas is not cleared on every mouse move
+- Only the new line segment is drawn
+- Ensures smooth performance
 
-**7.2 Full Canvas Rebuild (Rare Case)**
+### 7.2 Full Canvas Rebuild (Rare Case)
 Triggered only on:
 
--Late join
--Undo
--Redo
+- Late join
+- Undo
+- Redo
 
 Process: Clear canvas → Replay all stroke operations
 
-**8. Cursor Rendering (Overlay Canvas)**
+## 8. Cursor Rendering (Overlay Canvas)
 To avoid polluting the drawing canvas:
--Two canvas layers are used:
+- Two canvas layers are used:
    Base canvas → persistent drawing
    Overlay canvas → cursors only
 
 The cursor canvas:
--Is cleared every update
--Uses pointer-events: none
--Does not affect undo/redo or replay
+- Is cleared every update
+- Uses pointer-events: none
+- Does not affect undo/redo or replay
 
-**9. Undo / Redo Architecture (Global)**
+## 9. Undo / Redo Architecture (Global)
 Undo and redo are global operations, not per-user.
 
-**9.1 Server Data Structures**
+### 9.1 Server Data Structures
 operations[]  // visible strokes
 undoStack[]   // applied strokes
 redoStack[]   // undone strokes
 
-**9.2 Undo Flow**
+### 9.2 Undo Flow
 1. Pop last stroke from undoStack
 2. Remove it from operations
 3. Push it to redoStack
 4. Broadcast full canvas (INIT_CANVAS)
 
-**9.3 Redo Flow**
+### 9.3 Redo Flow
 1. Pop stroke from redoStack
 2. Add it back to operations
 3. Push to undoStack   
 4. Broadcast full canvas
 
-**Why This Works**
+### Why This Works
 -Deterministic ordering
 -No conflicts
 -All clients remain consistent
 Undo is intentionally allowed across users.
 
-**10. Conflict Resolution Strategy**
+## 10. Conflict Resolution Strategy
 No explicit conflict resolution is required.
 
--Overlapping strokes are valid
--Server arrival order defines layering
--Later strokes render on top
+- Overlapping strokes are valid
+- Server arrival order defines layering
+- Later strokes render on top
 
 This matches behavior of real collaborative tools.
 
-**11. Performance Considerations**
+## 11. Performance Considerations
 
--Lightweight point-based events
--No full redraw during drawing
--Cursor rendering isolated from drawing logic
--Minimal server-side computation
+- Lightweight point-based events
+- No full redraw during drawing
+- Cursor rendering isolated from drawing logic
+- Minimal server-side computation
 
-**12. Summary**
+## 12. Summary
 This system prioritizes:
 
--Deterministic synchronization
--Server-authoritative state
--Clean undo/redo semantics
--Real-time performance
+- Deterministic synchronization
+- Server-authoritative state
+- Clean undo/redo semantics
+- Real-time performance
 
 The architecture mirrors how real collaborative drawing tools are designed.
