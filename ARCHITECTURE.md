@@ -1,245 +1,183 @@
-Real-Time Collaborative Drawing Canvas
-1. High-Level Architecture
+# ARCHITECTURE.md  
+## Real-Time Collaborative Drawing Canvas
 
-This application is a real-time collaborative drawing system built using a client-server model.
+---
 
-Client: React + HTML Canvas
+## 1. Overview
 
-Server: Node.js + Express + Socket.io
+This project is a **real-time collaborative drawing application** where multiple users can draw simultaneously on a shared canvas with live synchronization.
 
-Transport: WebSockets (Socket.io)
+The system is designed around **operation-based state synchronization**, where drawing actions are represented as strokes rather than pixels. The server maintains the authoritative canvas state and ensures consistency across all clients.
 
-The server acts as the single source of truth for canvas state, while clients perform optimistic rendering for low-latency drawing.
+---
 
-User Action
-   ↓
-Client Canvas (optimistic draw)
-   ↓
-WebSocket Event
-   ↓
-Server (authoritative state)
-   ↓
-Broadcast to other clients
-   ↓
-Other clients replay stroke
+## 2. Tech Stack
 
-2. Core Design Principles
-2.1 Server-Authoritative State
+### Frontend
+- React (functional components + hooks)
+- HTML Canvas API
+- Socket.io Client
 
-The server maintains the authoritative operation log
+### Backend
+- Node.js
+- Express
+- Socket.io (WebSockets)
 
-Clients never decide global history (undo/redo)
+### Communication
+- WebSocket-based, event-driven protocol
 
-All users remain deterministic and consistent
+---
 
-2.2 Operation-Based Sync (Not Pixels)
+## 3. High-Level Architecture
 
-We never sync raw pixels
+User Input (Mouse / Keyboard)
+↓
+Client Canvas (Optimistic Draw)
+↓
+WebSocket Event (Stroke / Cursor)
+↓
+Server (Authoritative State)
+↓
+Broadcast to Other Clients
+↓
+Clients Replay Stroke Incrementally
 
-All drawing is represented as stroke operations
 
-Canvas state can be rebuilt at any time by replaying operations
+### Key Design Choice
+- **Client draws optimistically** for zero latency
+- **Server owns history** to guarantee determinism
 
-2.3 Optimistic Rendering
+---
 
-The local user draws immediately on the canvas
+## 4. Core Design Principles
 
-Server only relays events
+### 4.1 Server-Authoritative State
+- The server is the single source of truth
+- Clients never decide global canvas history
+- Prevents divergence and conflict
 
-This avoids perceptible latency during drawing
+### 4.2 Operation-Based Synchronization
+- No pixel data is synced
+- Canvas state is rebuilt from stroke operations
+- Enables undo/redo and late join synchronization
 
-3. Data Model
-3.1 Stroke Operation
+### 4.3 Deterministic Rendering
+- All clients replay strokes in the same order
+- Order is defined by server event sequence
 
-Each stroke is treated as an immutable operation:
+---
 
+## 5. Data Model
+
+### 5.1 Stroke Operation
+
+Each stroke is an immutable operation:
+
+```ts
 Stroke {
   id: number
   color: string
   tool: "brush" | "eraser"
   points: { x: number, y: number }[]
 }
+```
 
+**6. WebSocket Protocol**
 
-color is captured at stroke start
+**6.1 Client -> Server WebSocket Events**
+| Event Name       | Payload                          | Description                         |
+|------------------|----------------------------------|-------------------------------------|
+| STROKE_START     | { point, tool, color }           | Start a new stroke                  |
+| STROKE_MOVE      | { point, tool }                  | Stream stroke points in real time   |
+| STROKE_END       | —                                | End the current stroke              |
+| CURSOR_MOVE      | { x, y }                         | Send live cursor position           |
+| UNDO             | —                                | Undo last global stroke             |
+| REDO             | —                                | Redo last undone stroke             |
 
-tool determines rendering mode
+**6.2 Server → Client WebSocket Events**
+| Event Name       | Payload                          | Description                         |
+|------------------|----------------------------------|-------------------------------------|
+| INIT_CANVAS      | Stroke[]                         | Full canvas state sync              |
+| STROKE_START     | { point, color, tool }           | Remote stroke started               |
+| STROKE_MOVE      | { point, color, tool }           | Remote stroke update                |
+| STROKE_END       | —                                | Remote stroke ended                 |
+| CURSOR_MOVE      | { userId, x, y, color }          | Remote user cursor position         |
 
-points are streamed incrementally
+**7. Canvas Rendering Strategy**
+**7.1 Incremental Drawing (Normal Case)**
 
-4. WebSocket Protocol
-4.1 Client → Server Events
-Event	Payload	Description
-STROKE_START	{ point, tool, color }	Start new stroke
-STROKE_MOVE	{ point, tool }	Add point to stroke
-STROKE_END	—	End stroke
-CURSOR_MOVE	{ x, y }	Cursor position
-UNDO	—	Global undo
-REDO	—	Global redo
-4.2 Server → Client Events
-Event	Payload	Description
-INIT_CANVAS	Stroke[]	Full canvas state
-STROKE_START	{ point, color, tool }	Remote stroke start
-STROKE_MOVE	{ point, color, tool }	Remote stroke update
-STROKE_END	—	Remote stroke end
-CURSOR_MOVE	{ userId, x, y, color }	Remote cursor
-5. Canvas Rendering Strategy
-5.1 Incremental Drawing
+·Canvas is not cleared on every mouse move
+·Only the new line segment is drawn
+·Ensures smooth performance
 
-Canvas is not cleared per mouse move
+**7.2 Full Canvas Rebuild (Rare Case)**
+Triggered only on:
 
-Each mouse movement draws only the new line segment
+·Late join
+·Undo
+·Redo
 
-This avoids unnecessary redraws and improves performance
+Process: Clear canvas → Replay all stroke operations
 
-5.2 Full Redraw (Rare)
+**8. Cursor Rendering (Overlay Canvas)**
+To avoid polluting the drawing canvas:
+·Two canvas layers are used:
+   Base canvas → persistent drawing
+   Overlay canvas → cursors only
 
-Full canvas redraw happens only when:
+The cursor canvas:
+·Is cleared every update
+·Uses pointer-events: none
+·Does not affect undo/redo or replay
 
-A user joins late
-
-Global undo is performed
-
-Global redo is performed
-
-Clear canvas → replay operations in order
-
-6. Cursor Rendering (Overlay Canvas)
-
-To prevent cursor artifacts from polluting the drawing:
-
-Two canvas layers are used:
-
-Base canvas → persistent drawing
-
-Overlay canvas → cursors only
-
-The cursor layer is:
-
-Cleared every frame
-
-Marked pointer-events: none
-
-Completely independent of undo/redo
-
-This ensures cursor visuals are ephemeral, not permanent.
-
-7. Undo / Redo Architecture (Global)
-
+**9. Undo / Redo Architecture (Global)**
 Undo and redo are global operations, not per-user.
 
-7.1 Server Data Structures
+**9.1 Server Data Structures**
 operations[]  // visible strokes
 undoStack[]   // applied strokes
 redoStack[]   // undone strokes
 
-7.2 Undo Flow
+**9.2 Undo Flow**
+1. Pop last stroke from undoStack
+2. Remove it from operations
+3. Push it to redoStack
+4. Broadcast full canvas (INIT_CANVAS)
 
-Remove last stroke from undoStack
+**9.3 Redo Flow**
+1. Pop stroke from redoStack
+2. Add it back to operations
+3. Push to undoStack   
+4. Broadcast full canvas
 
-Remove it from operations
+**Why This Works**
+·Deterministic ordering
+·No conflicts
+·All clients remain consistent
+Undo is intentionally allowed across users.
 
-Push it to redoStack
+**10. Conflict Resolution Strategy**
+No explicit conflict resolution is required.
 
-Broadcast full canvas (INIT_CANVAS)
+·Overlapping strokes are valid
+·Server arrival order defines layering
+·Later strokes render on top
 
-7.3 Redo Flow
+This matches behavior of real collaborative tools.
 
-Pop stroke from redoStack
+**11. Performance Considerations**
 
-Add it back to operations
+·Lightweight point-based events
+·No full redraw during drawing
+·Cursor rendering isolated from drawing logic
+·Minimal server-side computation
 
-Push to undoStack
-
-Broadcast full canvas
-
-Why this works
-
-Deterministic order
-
-No conflicts
-
-All users remain in sync
-
-Undo is allowed across users by design.
-
-8. Eraser Tool Design
-
-The eraser is implemented as a special stroke, not pixel deletion.
-
-Technique Used
-globalCompositeOperation = "destination-out"
-
-Benefits
-
-Eraser participates in operation log
-
-Undo/redo works naturally
-
-Late joiners see correct erased state
-
-This avoids special-case logic.
-
-9. Conflict Resolution Strategy
-
-There is no stroke-level conflict resolution.
-
-Reason:
-
-Overlapping strokes are valid
-
-Order is determined by server arrival
-
-Later strokes render on top
-
-This matches real collaborative tools (e.g., Figma, Excalidraw).
-
-10. Performance Considerations
-
-Mouse move events are lightweight
-
-Only point deltas are transmitted
-
-Full redraws are rare
-
-Cursor rendering isolated from drawing logic
-
-This allows smooth drawing even with multiple users.
-
-11. Scalability Discussion (Interview)
-
-To scale beyond a single server:
-
-Use Redis Pub/Sub for Socket.io
-
-Shard rooms across instances
-
-Periodic canvas snapshots + delta replay
-
-Rate-limit cursor events
-
-12. Known Limitations
-
-Canvas state is in-memory (no persistence)
-
-No authentication
-
-No mobile touch optimizations
-
-No shape tools
-
-These were intentionally excluded to focus on real-time correctness.
-
-13. Summary
-
+**12. Summary**
 This system prioritizes:
 
-Deterministic synchronization
-
-Server-authoritative state
-
-Clean undo/redo semantics
-
-Real-time performance
+·Deterministic synchronization
+·Server-authoritative state
+·Clean undo/redo semantics
+·Real-time performance
 
 The architecture mirrors how real collaborative drawing tools are designed.
