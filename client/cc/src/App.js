@@ -22,7 +22,51 @@ function App() {
 
   const cursorCanvasRef = useRef(null);
 
+  const applyTool = (ctx, tool, color) => {
+    if (tool === "eraser") {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.lineWidth = 20;
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 4;
+    }
+  };
 
+  const redrawFromOperations = useCallback((operations) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    operations.forEach((stroke) => {
+      applyTool(ctx, stroke.tool, stroke.color);
+
+      for (let i = 1; i < stroke.points.length; i++) {
+        const prev = stroke.points[i - 1];
+        const curr = stroke.points[i];
+
+        ctx.beginPath();
+        ctx.moveTo(prev.x, prev.y);
+        ctx.lineTo(curr.x, curr.y);
+        ctx.stroke();
+      }
+    });
+
+    ctx.globalCompositeOperation = "source-over";
+  }, []);
+
+  useEffect(() => {
+    const cursorCanvas = cursorCanvasRef.current;
+    if (!cursorCanvas) return;
+
+    cursorCanvas.width = window.innerWidth;
+    cursorCanvas.height = window.innerHeight;
+  }, []);
 
   /**
    * =========================
@@ -30,10 +74,6 @@ function App() {
    * =========================
    */
   useEffect(() => {
-
-    const cursorCanvas = cursorCanvasRef.current;
-    cursorCanvas.width = window.innerWidth;
-    cursorCanvas.height = window.innerHeight;
 
     socket.on("connect", () => {
       console.log("Connected:", socket.id);
@@ -81,7 +121,7 @@ function App() {
     });
 
     return () => socket.disconnect();
-  }, []);
+  }, [redrawFromOperations]);
 
   /**
    * =========================
@@ -130,16 +170,6 @@ function App() {
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
-  const applyTool = (ctx, tool, color) => {
-    if (tool === "eraser") {
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.lineWidth = 20;
-    } else {
-      ctx.globalCompositeOperation = "source-over";
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 4;
-    }
-  };
 
   /**
    * =========================
@@ -156,7 +186,7 @@ function App() {
       tool,
       color: userColor,
     });
-    
+
   };
 
   const handleMouseMove = (e) => {
@@ -191,39 +221,15 @@ function App() {
    * CANVAS REPLAY
    * =========================
    */
-  const redrawFromOperations = useCallback((operations) => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-  
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
-    operations.forEach((stroke) => {
-      applyTool(ctx, stroke.tool, stroke.color);
-  
-      for (let i = 1; i < stroke.points.length; i++) {
-        const a = stroke.points[i - 1];
-        const b = stroke.points[i];
-  
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-      }
-    });
-  
-    ctx.globalCompositeOperation = "source-over";
-  }, [redrawFromOperations]);
-  
+
 
   const drawCursors = () => {
     const canvas = cursorCanvasRef.current;
     const ctx = canvas.getContext("2d");
-  
+
     // Clear cursor layer every time
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
+
     Object.values(cursorsRef.current).forEach(({ x, y, color }) => {
       ctx.beginPath();
       ctx.arc(x, y, 5, 0, Math.PI * 2);
@@ -231,7 +237,7 @@ function App() {
       ctx.fill();
     });
   };
-  
+
   return (
     <div style={{ position: "relative" }}>
       {/* Color Picker UI */}
@@ -257,7 +263,7 @@ function App() {
           Tool: {tool}
         </div>
       </div>
-  
+
       {/* Drawing canvas */}
       <canvas
         ref={canvasRef}
@@ -273,7 +279,7 @@ function App() {
           cursor: "crosshair",
         }}
       />
-  
+
       {/* Cursor overlay canvas */}
       <canvas
         ref={cursorCanvasRef}
@@ -286,7 +292,7 @@ function App() {
         }}
       />
     </div>
-  );  
+  );
 }
 
 export default App;
