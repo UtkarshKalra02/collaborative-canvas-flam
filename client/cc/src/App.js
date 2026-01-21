@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { io } from "socket.io-client";
+
 
 // Connect to backend
 const socket = io("https://collaborative-canvas-flam-6ie6.onrender.com");
@@ -190,28 +191,31 @@ function App() {
    * CANVAS REPLAY
    * =========================
    */
-  const redrawFromOperations = (operations) => {
+  const redrawFromOperations = useCallback((operations) => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-
+  
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+  
     operations.forEach((stroke) => {
       applyTool(ctx, stroke.tool, stroke.color);
+  
       for (let i = 1; i < stroke.points.length; i++) {
         const a = stroke.points[i - 1];
         const b = stroke.points[i];
+  
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
         ctx.stroke();
       }
     });
-
+  
     ctx.globalCompositeOperation = "source-over";
-  };
+  }, [redrawFromOperations]);
+  
 
   const drawCursors = () => {
     const canvas = cursorCanvasRef.current;
