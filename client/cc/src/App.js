@@ -22,7 +22,7 @@ function App() {
 
   const cursorCanvasRef = useRef(null);
 
-  const applyTool = (ctx, tool, color) => {
+  const applyTool = useCallback((ctx, tool, color) => {
     if (tool === "eraser") {
       ctx.globalCompositeOperation = "destination-out";
       ctx.lineWidth = 20;
@@ -31,34 +31,39 @@ function App() {
       ctx.strokeStyle = color;
       ctx.lineWidth = 4;
     }
-  };
-
-  const redrawFromOperations = useCallback((operations) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    operations.forEach((stroke) => {
-      applyTool(ctx, stroke.tool, stroke.color);
-
-      for (let i = 1; i < stroke.points.length; i++) {
-        const prev = stroke.points[i - 1];
-        const curr = stroke.points[i];
-
-        ctx.beginPath();
-        ctx.moveTo(prev.x, prev.y);
-        ctx.lineTo(curr.x, curr.y);
-        ctx.stroke();
-      }
-    });
-
-    ctx.globalCompositeOperation = "source-over";
   }, []);
+  
+
+  const redrawFromOperations = useCallback(
+    (operations) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+  
+      const ctx = canvas.getContext("2d");
+  
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+      operations.forEach((stroke) => {
+        applyTool(ctx, stroke.tool, stroke.color);
+  
+        for (let i = 1; i < stroke.points.length; i++) {
+          const prev = stroke.points[i - 1];
+          const curr = stroke.points[i];
+  
+          ctx.beginPath();
+          ctx.moveTo(prev.x, prev.y);
+          ctx.lineTo(curr.x, curr.y);
+          ctx.stroke();
+        }
+      });
+  
+      ctx.globalCompositeOperation = "source-over";
+    },
+    [applyTool]
+  );
+  
 
   useEffect(() => {
     const cursorCanvas = cursorCanvasRef.current;
